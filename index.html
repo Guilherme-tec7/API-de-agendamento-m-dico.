@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Agendamento Médico</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    select, input, button { margin: 10px 0; padding: 5px; }
+    .horario { margin: 5px; padding: 5px 10px; border: 1px solid #ccc; display: inline-block; cursor: pointer; }
+    .disponivel { background-color: #c8f7c5; }
+    .indisponivel { background-color: #f7c5c5; cursor: not-allowed; }
+  </style>
+</head>
+<link rel="stylesheet" href="styles.css">
+<body>
+
+<h2>Agendamento Médico</h2>
+
+<!-- FILTROS INICIAIS -->
+<div>
+  <label>Especialidade:</label>
+  <select id="especialidade"></select><br>
+
+  <label>Convênio:</label>
+  <select id="convenio"></select><br>
+
+  <label>Médico (opcional):</label>
+  <select id="medico">
+    <option value="">-- Qualquer médico --</option>
+  </select><br>
+
+  <label>Data:</label>
+  <input type="date" id="data"><br>
+
+  <button onclick="buscarHorarios()">Buscar horários</button>
+</div>
+
+<!-- HORÁRIOS -->
+<h3>Horários disponíveis</h3>
+<div id="horarios"></div>
+
+<!-- AGENDAMENTO -->
+<h3>Agendar consulta</h3>
+<form id="form-agendar">
+  <label>Paciente:</label>
+  <input type="text" id="paciente" required><br>
+  <input type="hidden" id="horarioSelecionado" name="horarioSelecionado">
+  <button type="submit">Confirmar Agendamento</button>
+</form>
+
+<!-- LISTA DE AGENDAMENTOS -->
+<h3>Agendamentos Existentes</h3>
+<div id="agendamentos"></div>
+
+<script>
+  // Simula carregamento inicial
+  async function carregarListas() {
+    // Simulando fetch em endpoints fictícios
+    const especialidades = await fetch('https://api.ficticia.com/especialidades').then(res => res.json());
+    const convenios = await fetch('https://api.ficticia.com/convenios').then(res => res.json());
+    const medicos = await fetch('https://api.ficticia.com/medicos').then(res => res.json());
+
+    // Popular selects
+    const espSelect = document.getElementById('especialidade');
+    especialidades.forEach(e => {
+      const option = document.createElement('option');
+      option.value = e.id;
+      option.textContent = e.nome;
+      espSelect.appendChild(option);
+    });
+
+    const convSelect = document.getElementById('convenio');
+    convenios.forEach(c => {
+      const option = document.createElement('option');
+      option.value = c.id;
+      option.textContent = c.nome;
+      convSelect.appendChild(option);
+    });
+
+    const medSelect = document.getElementById('medico');
+    medicos.forEach(m => {
+      const option = document.createElement('option');
+      option.value = m.id;
+      option.textContent = m.nome;
+      medSelect.appendChild(option);
+    });
+  }
+
+  // Buscar horários disponíveis
+  async function buscarHorarios() {
+    const esp = document.getElementById('especialidade').value;
+    const conv = document.getElementById('convenio').value;
+    const med = document.getElementById('medico').value;
+    const data = document.getElementById('data').value;
+
+    const response = await fetch(`https://api.ficticia.com/horarios?especialidade=${esp}&convenio=${conv}&medico=${med}&data=${data}`);
+    const horarios = await response.json();
+
+    const horariosDiv = document.getElementById('horarios');
+    horariosDiv.innerHTML = '';
+
+    horarios.forEach(h => {
+      const div = document.createElement('div');
+      div.className = 'horario ' + (h.disponivel ? 'disponivel' : 'indisponivel');
+      div.textContent = h.hora;
+      if (h.disponivel) {
+        div.onclick = () => {
+          document.getElementById('horarioSelecionado').value = h.id;
+          alert('Horário selecionado: ' + h.hora);
+        };
+      }
+      horariosDiv.appendChild(div);
+    });
+  }
+
+  // Agendar consulta
+  document.getElementById('form-agendar').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const paciente = document.getElementById('paciente').value;
+    const horarioId = document.getElementById('horarioSelecionado').value;
+    if (!horarioId) return alert('Selecione um horário disponível.');
+
+    const dados = { paciente, horario_id: horarioId };
+    const res = await fetch('https://api.ficticia.com/agendamentos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dados)
+    });
+
+    if (res.ok) {
+      alert('Consulta agendada com sucesso!');
+      listarAgendamentos();
+    } else {
+      alert('Erro ao agendar consulta.');
+    }
+  });
+
+  // Listar agendamentos
+  async function listarAgendamentos() {
+    const res = await fetch('https://api.ficticia.com/agendamentos');
+    const agendamentos = await res.json();
+    const div = document.getElementById('agendamentos');
+    div.innerHTML = '';
+
+    agendamentos.forEach(a => {
+      const el = document.createElement('div');
+      el.innerHTML = `
+        <strong>${a.paciente}</strong> – ${a.data} ${a.hora} – ${a.medico} (${a.especialidade})<br>
+        <button onclick="marcarComoAtendido(${a.id})">Marcar como atendido</button>
+        <hr>
+      `;
+      div.appendChild(el);
+    });
+  }
+
+  // Marcar como atendido (opcional)
+  async function marcarComoAtendido(id) {
+    const res = await fetch(`https://api.ficticia.com/agendamentos/${id}/atendido`, {
+      method: 'PATCH'
+    });
+    if (res.ok) {
+      alert('Consulta marcada como atendida.');
+      listarAgendamentos();
+    } else {
+      alert('Erro ao atualizar.');
+    }
+  }
+
+  // Inicialização
+  carregarListas();
+  listarAgendamentos();
+</script>
+
+</body>
+</html>
